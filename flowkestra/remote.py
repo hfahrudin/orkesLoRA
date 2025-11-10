@@ -1,9 +1,9 @@
 import os
-from orkeslora.utils import SSHClient  # your SSH wrapper
+from flowkestra.utils import SSHClient  # your SSH wrapper
 
 class RemoteTrainer:
     def __init__(self, hostname, username, password=None, key_filename=None, port=22,
-                 remote_workdir="/home/user/training", venv_name="orkeslora_env",
+                 remote_workdir="/home/user/training", venv_name="flowkestra_env",
                  requirements="requirements.txt", mlflow_uri=None):
         self.hostname = hostname
         self.username = username

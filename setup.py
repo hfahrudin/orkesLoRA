@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="orkeslora",
+    name="flowkestra",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
@@ -12,7 +12,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "orkeslora=orkeslora.cli:main"
+            "flowkestra=flowkestra.cli:main"
         ]
     },
     python_requires=">=3.8",

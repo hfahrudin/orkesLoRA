@@ -1,6 +1,6 @@
 import yaml
-from orkeslora.remote import RemoteTrainer
-from orkeslora.local import LocalTrainer
+from flowkestra.remote import RemoteTrainer
+from flowkestra.local import LocalTrainer
 
 
 class TrainingManager:
@@ -17,7 +17,7 @@ class TrainingManager:
 
         for instance_conf in self.instances:
             mode = instance_conf.get("mode", "local")
-            venv_name = instance_conf.get("venv_name", "orkeslora_env")
+            venv_name = instance_conf.get("venv_name", "flowkestra_env")
             requirements = instance_conf.get("requirements", "requirements.txt")
 
             if mode == "local":

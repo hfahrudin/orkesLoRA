@@ -2,11 +2,11 @@ import argparse
 import sys
 import subprocess
 import os
-from orkeslora.manager import TrainingManager
+from flowkestra.manager import TrainingManager
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Orkeslora: Run local or remote ML training from a YAML config"
+        description="flowkestra: Run local or remote ML training from a YAML config"
     )
     parser.add_argument(
         "-f", "--file",
