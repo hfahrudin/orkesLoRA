@@ -13,3 +13,4 @@ legacy/
 flowkestra.egg-info
 local_test/
 test_data/
+mlartifacts/
