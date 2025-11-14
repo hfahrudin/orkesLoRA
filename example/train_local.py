@@ -7,7 +7,8 @@ import os
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_path", default="./data/processed/train_local_processed.csv")
-    parser.add_argument("--output_dir", default="./outputs/finetuned")
+    default_output_dir = os.environ.get("OUTPUT_DIR", "./outputs/finetuned")
+    parser.add_argument("--output_dir", default=default_output_dir)
     parser.add_argument("--model_name", default="mock_model")
     args = parser.parse_args()
 
