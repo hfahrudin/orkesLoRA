@@ -109,7 +109,8 @@ class Runner:
         if self.ssh_client:
             # Prepare environment string for remote shell
             env_str = " ".join(f"{k}='{v}'" for k, v in env.items())
-            full_cmd = f"{env_str} {cmd}" if env_str else cmd
+            # Prepend 'cd' command to ensure execution in workdir
+            full_cmd = f"cd {self.workdir} && {env_str} {cmd}" if env_str else f"cd {self.workdir} && {cmd}"
             out, err = self.ssh_client.execute(full_cmd)
             if out:
                 print(out)
@@ -125,7 +126,8 @@ class Runner:
                     check=True,
                     env=env,
                     text=True,
-                    capture_output=True
+                    capture_output=True,
+                    cwd=self.workdir
                 )
                 print(result.stdout)
                 if result.stderr:

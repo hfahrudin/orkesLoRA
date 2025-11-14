@@ -21,7 +21,7 @@ class Trainer:
         self.name = name
         self.origin_dir = Path(origin_dir)
         self.workdir = Path(workdir)
-        self.requirements = Path(requirements)
+        self.requirements = self.workdir / requirements
         self.pipelines = pipelines
         self.mlflow_uri = mlflow_uri
         
