@@ -118,7 +118,7 @@ class Runner:
                 print(err)
             return out, err
         else:
-            print(f"[LOCAL] Running: {cmd}")
+            print(f"Running: {cmd}")
             try:
                 result = subprocess.run(
                     cmd,

@@ -65,8 +65,9 @@ class Trainer:
     def run(self):
         """Run all pipeline scripts in sequence with prepared environment."""
         env = os.environ.copy()
-        if self.mlflow_uri:
-            env["MLFLOW_TRACKING_URI"] = self.mlflow_uri
+        os.environ["MLFLOW_TRACKING_URI"] = "http://localhost:5000"
+        os.environ["MLFLOW_EXPERIMENT_NAME"] = "my_love_story"
+
 
         results = {}
         for step_name, script_name in self.pipelines.items():
