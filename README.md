@@ -1,5 +1,5 @@
 <h2 align="center">
-  <img width="15%" alt="Model2Vec logo" src="assets/flowkestra.png"><br/>
+  <img width="35%" alt="Model2Vec logo" src="assets/flowkestra.png"><br/>
   A streamlined MLflow orchestrator 
 </h2>
 
