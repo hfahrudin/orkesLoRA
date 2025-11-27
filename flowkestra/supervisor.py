@@ -8,6 +8,8 @@ from typing import Dict, Any, List, Union, Tuple
 import time
 import os 
 from concurrent.futures import ThreadPoolExecutor
+import requests
+
 
 class Supervisor:
     def __init__(self, config_path: str):
@@ -19,8 +21,20 @@ class Supervisor:
         self.concurrency_units: List[Union[threading.Thread, multiprocessing.Process]] = []
         self.all_finished = threading.Event() 
         self._print_timing = 5
+        if not self._check_mlflow_server(self.mlflow_uri):
+            raise RuntimeError(f"MLflow server not reachable at {self.mlflow_uri}")
         self._initialize_workers()
 
+    def _check_mlflow_server(self, uri: str) -> bool:
+        """
+        Verify that the MLflow server is alive by querying the /api/2.0/preview/mlflow/experiments/list endpoint.
+        """
+        try:
+            response = requests.get(f"{uri}/api/2.0/preview/mlflow/experiments/list", timeout=3)
+            return response.status_code == 200
+        except requests.RequestException as e:
+            raise RuntimeError(f"Failed to connect to MLflow server at {uri}")
+        
     def _initialize_workers(self):
         def init_worker(cfg):
             unique_id = str(uuid.uuid4())
