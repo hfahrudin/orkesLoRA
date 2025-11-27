@@ -6,25 +6,17 @@ from flowkestra.utils import SSHClient
 from flowkestra.schema import SSHConfig
 from typing import Optional
 
-class Trainer:
-    def __init__(self, name, workdir, origin_dir, requirements, pipelines, mlflow_uri=None, ssh_config: Optional[SSHConfig] = None):
-        """
-        Args:
-            name (str): Experiment name
-            workdir (str or Path): local or remote working directory
-            origin_dir (str or Path): directory containing scripts and resources
-            requirements (str or Path): path to requirements.txt
-            pipelines (dict): ordered dict of {step_name: script_name}
-            mlflow_uri (str, optional)
-            ssh_client (SSHClient, optional): if provided, run on remote server
-        """
-        self.name = name
+class Worker:
+    def __init__(self, worker_id, workdir, origin_dir, main_states, requirements, pipelines, experiment_name=None ,mlflow_uri=None, ssh_config: Optional[SSHConfig] = None):
+
+        self.worker_id = worker_id
         self.origin_dir = Path(origin_dir)
         self.workdir = Path(workdir)
         self.requirements = self.workdir / requirements
         self.pipelines = pipelines
-        self.mlflow_uri = mlflow_uri
-        
+        self.mlflow_uri = mlflow_uri if mlflow_uri else "http://localhost:5000"
+        self.experiment_name = experiment_name if experiment_name else "default_experiment"
+        self.main_states = main_states
         if ssh_config:
             self.ssh_client = SSHClient(ssh_config)
         else:
@@ -33,13 +25,17 @@ class Trainer:
         # Initialize Runner (local or remote)
         self.runner = Runner(workdir=self.workdir, ssh_client=self.ssh_client)
 
-        # Copy all files from origin_dir to workdir
+        self.main_states[self.worker_id]['status'] = 'synchronizing'
+        self._clean_workdir
+
+        # Now sync origin_dir into the clean directory
         self._sync_workdir()
+        self.main_states[self.worker_id]['status'] = 'environment setup'
 
-        # Setup environment
+        # # Setup environment
         self.runner.setup_environment(self.requirements)
-        print(f"Environment for {self.name} has been prepared at {self.workdir}")
-
+        self.main_states[self.worker_id]['status'] = 'ready'
+        
     def _sync_workdir(self):
         """Copy origin_dir contents to workdir (local or remote)."""
         if self.runner.ssh_client:
@@ -65,14 +61,34 @@ class Trainer:
     def run(self):
         """Run all pipeline scripts in sequence with prepared environment."""
         env = os.environ.copy()
-        os.environ["MLFLOW_TRACKING_URI"] = "http://localhost:5000"
-        os.environ["MLFLOW_EXPERIMENT_NAME"] = "my_love_story"
+        os.environ["MLFLOW_TRACKING_URI"] =  self.mlflow_uri
+        os.environ["MLFLOW_EXPERIMENT_NAME"] = self.experiment_name
 
-
+        self.main_states[self.worker_id]['status'] = 'training'
         results = {}
         for step_name, script_name in self.pipelines.items():
             script_path = self.workdir / script_name  # always run from workdir
-            print(f"\n=== Running step: {step_name} ({script_name}) ===")
             result = self.runner.run_script(script_path, additional_env=env)
             results[step_name] = result
+        
+        self.main_states[self.worker_id]['status'] = 'completed'
+        self._clean_workdir()
         return results
+
+    def _clean_workdir(self):
+        """Delete all files and subfolders in the workdir (local or remote)."""
+        if self.runner.ssh_client:
+            # Remote clean
+            self.runner.ssh_client.execute(f"rm -rf {self.workdir}/*")
+            self.runner.ssh_client.execute(f"rm -rf {self.workdir}/.* 2>/dev/null || true")  
+        else:
+            # Local clean
+            if self.workdir.exists():
+                for item in self.workdir.iterdir():
+                    if item.is_file():
+                        item.unlink()
+                    else:
+                        shutil.rmtree(item)
+
+    def close(self):
+        self._clean_workdir()

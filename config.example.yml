@@ -1,21 +1,22 @@
 mlflow_uri: "http://localhost:5000"
 experiment_name : "example_experiment"
-script_path: "test_data/train_local.py"
 
 
 instances:
-  - name: local_run
-    mode: local
-    workdir: "./local_test"           
-    target_workdir: "./test_1"            # Where training and venv will live
-    venv_name: "flowkestra_env_local"   # Name of the virtual environment
+  - mode: local
+    workdir: "./test_data"           
+    target_workdir: "./local_train"            # Where training and venv will l
     requirements: "requirements_local.txt"   # Pip requirements file
-    etl_script: "etl_local.py"       # ETL script path
-    training_script: "train_local.py" # Training script path
-    dataset_path: "test_data/train_local.csv"   # Input dataset
-    artifacts:
-      - source: "outputs"        # Output folder in venv/workdir
-        target: "./local_outputs/"  # Local folder to copy artifacts to
+    pipelines: 
+      train : "mlflow_example.py" # Training script path
+
+
+  - mode: local
+    workdir: "./test_data"           
+    target_workdir: "./local_train2"            # Where training and venv will l
+    requirements: "requirements_local.txt"   # Pip requirements file
+    pipelines: 
+      train : "mlflow_example.py" # Training script path
 
   # - name: remote_gpu_server
   #   mode: remote

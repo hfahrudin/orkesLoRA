@@ -6,6 +6,7 @@ import platform
 
 from flowkestra.utils import SSHClient
 
+#ALL MESSAGES PRINTED FROM THIS CLASS SHOULD BE HANDLED BY WORKER HENCE ALL SUPRESSED OUTPUTS
 class Runner:
     def __init__(self, workdir, venv_name="venv", ssh_client: SSHClient =None):
         """
@@ -73,26 +74,36 @@ class Runner:
                 f"{self._get_pip()} install -r {requirements}"
             ]
             for cmd in cmds:
-                out, err = self.ssh_client.execute(cmd)
-                if out:
-                    print(out)
-                if err:
-                    print(err)
-            print(f"[REMOTE] Environment ready at {self.workdir}")
+                # Execute but ignore output
+                self.ssh_client.execute(cmd, suppress_output=True)
         else:
             # Local
             self.workdir.mkdir(parents=True, exist_ok=True)
             venv_path = self.workdir / self.venv_name
             if not venv_path.exists():
-                subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+                subprocess.run(
+                    [sys.executable, "-m", "venv", str(venv_path)],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
             pip_path = self._get_pip()
-            subprocess.run([str(pip_path), "install", "--upgrade", "pip"], check=True)
-            subprocess.run([str(pip_path), "install", "-r", str(requirements)], check=True)
-            print(f"[LOCAL] Environment ready at {self.workdir}")
+            subprocess.run(
+                [str(pip_path), "install", "--upgrade", "pip"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            subprocess.run(
+                [str(pip_path), "install", "-r", str(requirements)],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
 
     def run_script(self, script_path, additional_env=None):
         """
-        Run a Python script in local or remote environment.
+        Run a Python script in local or remote environment silently.
         
         Args:
             script_path (str or Path)
@@ -109,16 +120,11 @@ class Runner:
         if self.ssh_client:
             # Prepare environment string for remote shell
             env_str = " ".join(f"{k}='{v}'" for k, v in env.items())
-            # Prepend 'cd' command to ensure execution in workdir
             full_cmd = f"cd {self.workdir} && {env_str} {cmd}" if env_str else f"cd {self.workdir} && {cmd}"
+            # Execute remote command, ignore output
             out, err = self.ssh_client.execute(full_cmd)
-            if out:
-                print(out)
-            if err:
-                print(err)
-            return out, err
+            return out, err  # caller can handle it if needed
         else:
-            print(f"Running: {cmd}")
             try:
                 result = subprocess.run(
                     cmd,
@@ -129,10 +135,7 @@ class Runner:
                     capture_output=True,
                     cwd=self.workdir
                 )
-                print(result.stdout)
-                if result.stderr:
-                    print(result.stderr)
+                # suppress prints; caller can inspect result.stdout/result.stderr
                 return result
             except subprocess.CalledProcessError as e:
-                print(e.stderr)
-                return e
+                return e  # still return error for handling if needed
