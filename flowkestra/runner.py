@@ -8,16 +8,18 @@ from flowkestra.utils import SSHClient
 
 #ALL MESSAGES PRINTED FROM THIS CLASS SHOULD BE HANDLED BY WORKER HENCE ALL SUPRESSED OUTPUTS
 class Runner:
-    def __init__(self, workdir, venv_name="venv", ssh_client: SSHClient =None):
+    def __init__(self, workdir, venv_name="venv", ssh_client: SSHClient =None, suppress_output=True):
         """
         Args:
             workdir (str or Path): working directory (local or remote)
             venv_name (str): virtual environment name
             ssh_client (SSHClient, optional): if provided, scripts run remotely
+            suppress_output (bool): If True, suppress stdout/stderr from setup commands.
         """
         self.workdir = Path(workdir).resolve() if ssh_client is None else Path(workdir)
         self.venv_name = venv_name
         self.ssh_client = ssh_client
+        self.suppress_output = suppress_output
         self.remote_is_windows = None
 
         if self.ssh_client:
@@ -26,13 +28,18 @@ class Runner:
     def _detect_remote_os(self):
         """Detect if the remote server is Windows. Call this once during init."""
         try:
-            out, _ = self.ssh_client.execute("ver")  # Windows returns version info
-            if out:
-                print("Detected remote OS: Windows")
+            # The 'ver' command is specific to Windows and will typically fail on Unix-like systems.
+            # We rely on the command execution to fail (raising an exception) to infer a non-Windows OS.
+            out, _ = self.ssh_client.execute("ver", suppress_output=True)
+            if out and 'windows' in out.lower():
+                if not self.suppress_output:
+                    print("Detected remote OS: Windows")
                 return True
-        except:
+        except Exception:
+            # Assuming any error means it's not a Windows shell that knows 'ver'
             pass
-        print("Detected remote OS: Unix-like")
+        if not self.suppress_output:
+            print("Detected remote OS: Unix-like")
         return False
     
     def _get_venv_python(self):
@@ -65,6 +72,9 @@ class Runner:
 
     def setup_environment(self, requirements):
         """Set up virtual environment and install requirements."""
+        stdout = subprocess.DEVNULL if self.suppress_output else None
+        stderr = subprocess.DEVNULL if self.suppress_output else None
+
         if self.ssh_client:
             # Remote
             cmds = [
@@ -74,8 +84,7 @@ class Runner:
                 f"{self._get_pip()} install -r {requirements}"
             ]
             for cmd in cmds:
-                # Execute but ignore output
-                self.ssh_client.execute(cmd, suppress_output=True)
+                self.ssh_client.execute(cmd, suppress_output=self.suppress_output)
         else:
             # Local
             self.workdir.mkdir(parents=True, exist_ok=True)
@@ -84,58 +93,73 @@ class Runner:
                 subprocess.run(
                     [sys.executable, "-m", "venv", str(venv_path)],
                     check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                    stdout=stdout,
+                    stderr=stderr
                 )
             pip_path = self._get_pip()
             subprocess.run(
                 [str(pip_path), "install", "--upgrade", "pip"],
                 check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stdout=stdout,
+                stderr=stderr
             )
             subprocess.run(
                 [str(pip_path), "install", "-r", str(requirements)],
                 check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stdout=stdout,
+                stderr=stderr
             )
 
-    def run_script(self, script_path, additional_env=None):
+    def run_script(self, script_path, args=None, additional_env=None):
         """
-        Run a Python script in local or remote environment silently.
+        Run a Python script in local or remote environment.
+        Output is suppressed unless self.suppress_output is False.
         
         Args:
             script_path (str or Path)
+            args (list of str, optional): Arguments to pass to the script.
             additional_env (dict, optional)
         """
         script_path = Path(script_path).resolve()
-        env = os.environ.copy()
-        if additional_env:
-            env.update(additional_env)
-
+        
         venv_python = self._get_venv_python()
-        cmd = f"{venv_python} {script_path}"
-
+        
+        # Construct the command
+        cmd_parts = [str(venv_python), str(script_path)]
+        if args:
+            cmd_parts.extend(args)
+        
         if self.ssh_client:
-            # Prepare environment string for remote shell
-            env_str = " ".join(f"{k}='{v}'" for k, v in env.items())
+            # Remote execution: join parts into a command string
+            cmd = " ".join(cmd_parts)
+            env_str = ""
+            if additional_env:
+                env_str = " ".join(f"{k}='{v}'" for k, v in additional_env.items())
+
             full_cmd = f"cd {self.workdir} && {env_str} {cmd}" if env_str else f"cd {self.workdir} && {cmd}"
-            # Execute remote command, ignore output
-            out, err = self.ssh_client.execute(full_cmd)
-            return out, err  # caller can handle it if needed
+            # Respect the suppress_output flag
+            out, err = self.ssh_client.execute(full_cmd, suppress_output=self.suppress_output)
+            return out, err
         else:
+            # Local execution: inherit from os.environ and add/override with additional_env
+            env = os.environ.copy()
+            if additional_env:
+                env.update(additional_env)
+
+            # If suppressing, capture output. If not, let it stream to console.
+            capture = self.suppress_output
+            
             try:
+                # When shell=False (safer), pass command as a list.
                 result = subprocess.run(
-                    cmd,
-                    shell=True,
+                    cmd_parts,
+                    shell=False,
                     check=True,
                     env=env,
                     text=True,
-                    capture_output=True,
+                    capture_output=capture,
                     cwd=self.workdir
                 )
-                # suppress prints; caller can inspect result.stdout/result.stderr
                 return result
             except subprocess.CalledProcessError as e:
-                return e  # still return error for handling if needed
+                return e

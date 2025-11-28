@@ -12,10 +12,17 @@ import requests
 
 
 class Supervisor:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, visualize_progress=None, clear_screen_on_update=None, clean_workdir_after_run=None, suppress_runner_output=None):
         self.config = self._load_config(config_path)
         self.mlflow_uri = self.config.get('mlflow_uri', "http://localhost:5000")
         self.experiment_name = self.config.get('experiment_name', "default_experiment")
+        
+        # Prioritize CLI flags over config file settings
+        self.visualize_progress = visualize_progress if visualize_progress is not None else self.config.get('visualize_progress', True)
+        self.clear_screen_on_update = clear_screen_on_update if clear_screen_on_update is not None else self.config.get('clear_screen_on_update', True)
+        self.clean_workdir_after_run = clean_workdir_after_run if clean_workdir_after_run is not None else self.config.get('clean_workdir_after_run', True)
+        self.suppress_runner_output = suppress_runner_output if suppress_runner_output is not None else self.config.get('suppress_runner_output', True)
+
         self.manager = multiprocessing.Manager()
         self.worker_state = self.manager.dict()
         self.concurrency_units: List[Union[threading.Thread, multiprocessing.Process]] = []
@@ -49,22 +56,24 @@ class Supervisor:
         with ThreadPoolExecutor() as executor:
             futures = [executor.submit(init_worker, cfg) for cfg in self.config['instances']]
 
-            # Periodically print status until all workers are done
-            while not all(f.done() for f in futures):
-                time.sleep(self._print_timing)
-                self.clear_screen()
+            if self.visualize_progress:
+                # Periodically print status until all workers are done
+                while not all(f.done() for f in futures):
+                    time.sleep(self._print_timing)
+                    if self.clear_screen_on_update:
+                        self.clear_screen()
+                    
+                    self.print_status_table_setup(f"Worker Monitor ({self.experiment_name})")
+                    print("", end="", flush=True) 
                 
-                # 2. Print the table using the helper method
+                if self.clear_screen_on_update:
+                    self.clear_screen()
+                
                 self.print_status_table_setup(f"Worker Monitor ({self.experiment_name})")
-                
-                # Flush the output to ensure immediate update
-                # (Important for in-place console updates)
-                print("", end="", flush=True) 
-
-            
-            self.clear_screen()
-            
-            self.print_status_table_setup(f"Worker Monitor ({self.experiment_name})")
+            else:
+                # If no visualization, just wait for all initialization futures to complete
+                for f in futures:
+                    f.result() # This will also raise any exceptions from init_worker
 
     def _load_config(self, yaml_path: str) -> dict:
         with open(yaml_path, 'r') as f:
@@ -83,46 +92,33 @@ class Supervisor:
 
     def _assign_worker(self, id, config: Dict[str, Any]) -> Tuple[str, Worker]:
         unique_id = id
-        worker = None  # Initialize worker to None or a default value
+        worker = None
+
+        # Arguments common to all worker types
+        worker_args = {
+            'worker_id': unique_id,
+            'workdir': config['target_workdir'],
+            'origin_dir': config['workdir'],
+            'main_states': self.worker_state,
+            'requirements': config['requirements'],
+            'pipelines': config.get('pipelines'),
+            'experiment_name': self.experiment_name,
+            'mlflow_uri': self.mlflow_uri,
+            'clean_workdir_after_run': self.clean_workdir_after_run,
+            'suppress_output': self.suppress_runner_output
+        }
 
         if config['mode'] == 'local':
-            worker = Worker(
-                worker_id=unique_id,
-                workdir=config['target_workdir'],
-                origin_dir=config['workdir'],
-                # The shared, process-safe Manager().dict()
-                main_states=self.worker_state, 
-                requirements=config['requirements'],
-                pipelines=config.get('pipelines'),
-                experiment_name=self.experiment_name,
-                mlflow_uri=self.mlflow_uri,
-                ssh_config=None
-            )
+            worker = Worker(**worker_args, ssh_config=None)
         
-        # elif config['mode'] == 'remote':
-        #     # You MUST define what happens here, otherwise 'worker' remains None.
-        #     # Example: Initialize a RemoteWorker class
-        #     worker = Worker(
-        #         worker_id=unique_id,
-        #         workdir=config['target_workdir'],
-        #         origin_dir=config['workdir'],
-        #         main_states=self.worker_state,
-        #         requirements=config['requirements'],
-        #         pipelines=config.get('pipelines'),
-        #         experiment_name=self.experiment_name,
-        #         mlflow_uri=self.mlflow_uri,
-        #         # Pass the necessary SSH configuration for remote mode
-        #         ssh_config=config['ssh']
-        #     )
+        elif config['mode'] == 'remote':
+            # This assumes your Worker class can handle ssh_config when provided
+            worker = Worker(**worker_args, ssh_config=config.get('ssh'))
             
         else:
-            # Handle unknown modes explicitly
             raise ValueError(f"Unknown worker mode: {config['mode']}")
 
-        # Final check before returning
         if worker is None:
-            # This should ideally be unreachable if all modes are handled,
-            # but is a final safety net.
             raise RuntimeError("Worker initialization failed unexpectedly.")
         
         return worker
@@ -142,23 +138,15 @@ class Supervisor:
         print(header)
         print(separator)
         
-        # alive_count = 0
-        
         # Print row for each concurrency unit
         for wid, state in self.worker_state.items():
-
             worker_id = wid
             display_id = worker_id[:MAX_ID_WIDTH]
-            
-
             status = self.worker_state[worker_id]['status'] if worker_id in self.worker_state else "Unknown"
-
-
             row = f"| {display_id:<{MAX_ID_WIDTH}} | {status:<22} |"
             print(row)
             
         print(separator)
-        # print(f"[Monitor] Workers Alive: {alive_count}/{len(self.concurrency_units)}")
 
     def print_status_table(self, title: str):
         """Prints the worker status table once."""
@@ -183,8 +171,6 @@ class Supervisor:
             display_id = worker_id[:MAX_ID_WIDTH]
             
             is_alive = unit.is_alive()
-            # status = "Alive" if is_alive else "Finished"
-
             status = self.worker_state[worker_id]['status'] if worker_id in self.worker_state else "Unknown"
             
             if is_alive:
@@ -196,44 +182,42 @@ class Supervisor:
         print(separator)
         print(f"[Monitor] Workers Alive: {alive_count}/{len(self.concurrency_units)}")
     
-    # The monitor_workers method now uses the helper function
     def monitor_workers(self):
         """
         Runs in a separate thread and updates worker status 
         in-place by clearing the screen before each table print.
         """
+        if not self.visualize_progress:
+            # If visualization is off, just wait for the signal to finish.
+            self.all_finished.wait()
+            return
         
         while not self.all_finished.is_set():
-            # Wait for 1 second or until the 'finished' event is set
             finished_early = self.all_finished.wait(self._print_timing) 
             
             if finished_early:
-                break # Exit loop if workers finished and event was set
+                break
             
-            # 1. Clear the screen before printing the new table
-            self.clear_screen()
+            if self.clear_screen_on_update:
+                self.clear_screen()
             
-            # 2. Print the table using the helper method
             self.print_status_table(f"Worker Monitor ({self.experiment_name})")
-            
-            # Flush the output to ensure immediate update
-            # (Important for in-place console updates)
             print("", end="", flush=True) 
             
         # --- FINAL STATE ---
-        # 1. Clear the screen one last time
-        self.clear_screen()
+        if self.clear_screen_on_update:
+            self.clear_screen()
         
-        # 2. Print the final state table
         self.print_status_table("Final State (All Workers Finished)")
-
 
     def run_all(self):
         # 1. Initialize concurrency units
         for worker_id, worker_info in self.worker_state.items():
             worker: Worker = worker_info['obj'] 
 
-            if worker_id == 'local':
+            # Use multiprocessing for local workers (no SSH client)
+            # and threading for remote workers.
+            if worker.ssh_client is None:
                 unit = multiprocessing.Process(
                     target=worker.run, 
                     name=str(worker_id)
@@ -250,7 +234,7 @@ class Supervisor:
         # --- 2. Start the Monitor Thread ---
         monitor_thread = threading.Thread(
             target=self.monitor_workers, 
-            daemon=True, # Daemon ensures it doesn't block program exit if main thread crashes
+            daemon=True,
             name="WorkerMonitor"
         )
         monitor_thread.start()
@@ -262,7 +246,6 @@ class Supervisor:
         # --- 4. Signal the monitor thread to stop ---
         self.all_finished.set()
         
-        # Wait for the monitor to clean up and exit (optional, but good practice)
         monitor_thread.join()
 
         print("\nAll jobs were completed.")

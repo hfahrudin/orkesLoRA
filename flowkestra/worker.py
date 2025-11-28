@@ -7,7 +7,7 @@ from flowkestra.schema import SSHConfig
 from typing import Optional
 
 class Worker:
-    def __init__(self, worker_id, workdir, origin_dir, main_states, requirements, pipelines, experiment_name=None ,mlflow_uri=None, ssh_config: Optional[SSHConfig] = None):
+    def __init__(self, worker_id, workdir, origin_dir, main_states, requirements, pipelines, experiment_name=None ,mlflow_uri=None, ssh_config: Optional[SSHConfig] = None, suppress_output=True, clean_workdir_after_run=True):
 
         self.worker_id = worker_id
         self.origin_dir = Path(origin_dir)
@@ -17,16 +17,21 @@ class Worker:
         self.mlflow_uri = mlflow_uri if mlflow_uri else "http://localhost:5000"
         self.experiment_name = experiment_name if experiment_name else "default_experiment"
         self.main_states = main_states
+        self.clean_workdir_after_run = clean_workdir_after_run
         if ssh_config:
             self.ssh_client = SSHClient(ssh_config)
         else:
             self.ssh_client = None
 
         # Initialize Runner (local or remote)
-        self.runner = Runner(workdir=self.workdir, ssh_client=self.ssh_client)
+        self.runner = Runner(
+            workdir=self.workdir, 
+            ssh_client=self.ssh_client,
+            suppress_output=suppress_output
+        )
 
         self.main_states[self.worker_id]['status'] = 'synchronizing'
-        self._clean_workdir
+        self._clean_workdir()
 
         # Now sync origin_dir into the clean directory
         self._sync_workdir()
@@ -60,19 +65,27 @@ class Worker:
 
     def run(self):
         """Run all pipeline scripts in sequence with prepared environment."""
-        env = os.environ.copy()
-        os.environ["MLFLOW_TRACKING_URI"] =  self.mlflow_uri
-        os.environ["MLFLOW_EXPERIMENT_NAME"] = self.experiment_name
+        additional_env = {
+            "MLFLOW_TRACKING_URI": self.mlflow_uri,
+            "MLFLOW_EXPERIMENT_NAME": self.experiment_name
+        }
 
         self.main_states[self.worker_id]['status'] = 'training'
         results = {}
-        for step_name, script_name in self.pipelines.items():
-            script_path = self.workdir / script_name  # always run from workdir
-            result = self.runner.run_script(script_path, additional_env=env)
+        for step_name, pipeline_config in self.pipelines.items():
+            script_path = self.workdir / pipeline_config['script']
+            script_args = pipeline_config.get('args')
+            
+            result = self.runner.run_script(
+                script_path, 
+                args=script_args, 
+                additional_env=additional_env
+            )
             results[step_name] = result
         
         self.main_states[self.worker_id]['status'] = 'completed'
-        self._clean_workdir()
+        if self.clean_workdir_after_run:
+            self._clean_workdir()
         return results
 
     def _clean_workdir(self):
@@ -91,4 +104,5 @@ class Worker:
                         shutil.rmtree(item)
 
     def close(self):
-        self._clean_workdir()
+        if self.clean_workdir_after_run:
+            self._clean_workdir()

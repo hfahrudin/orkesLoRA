@@ -32,3 +32,7 @@ class ConfigSchema(BaseModel):
     mlflow_uri: str
     experiment_name: str
     instances: List[InstanceConfig]
+    visualize_progress: bool = True
+    clear_screen_on_update: bool = True
+    clean_workdir_after_run: bool = True
+    suppress_runner_output: bool = True
