@@ -11,7 +11,7 @@ This approach makes it easier to run, reproduce, and track your experiments, whe
 
 ---
 
-## Core Features (Currently Implemented)
+## Core Features
 
 - **YAML-based Workflows**: Define your experiment as a series of tasks in a simple `config.yml` file.
 - **Sequential Task Execution**: Runs your Python scripts in the order you define them.
