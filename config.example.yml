@@ -1,0 +1,41 @@
+mlflow_uri: "http://localhost:5000"
+experiment_name : "example_experiment"
+
+
+instances:
+  - mode: local
+    workdir: "./test_data"           
+    target_workdir: "./local_train"            # Where training and venv will l
+    requirements: "requirements_local.txt"   # Pip requirements file
+    pipelines: 
+      train : 
+        script: "mlflow_example.py" # Training script path
+        args: [
+          "--epoch", "50"
+        ]
+
+
+  - mode: local
+    workdir: "./test_data"           
+    target_workdir: "./local_train2"            # Where training and venv will l
+    requirements: "requirements_local.txt"   # Pip requirements file
+    pipelines: 
+      train : 
+        script: "mlflow_example.py" # Training script path
+        args: [
+          "--epoch", "30"
+        ]
+
+  # - name: remote_gpu_server
+  #   mode: remote
+  #   mlflow_uri: "http://mlflow.yourserver.com:5000"
+  #   venv_name: "flowkestra_env_gpu"
+  #   requirements: "requirements_gpu.txt"
+  #   etl_script: "scripts/etl_remote.py"
+  #   training_script: "scripts/train_remote.py"
+  #   dataset_path: "./data/train_remote.csv"
+  #   remote:
+  #     hostname: "192.168.1.100"
+  #     username: "ubuntu"
+  #     key_filename: "~/.ssh/id_rsa"
+  #     remote_workdir: "/home/ubuntu/flowkestra_runs/gpu_run"

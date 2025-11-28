@@ -5,3 +5,16 @@ __pycache__
 dist/
 upload.py
 .env
+.vscode
+mlruns
+legacy/
+*.yml
+!config.example.yml
+flowkestra.egg-info
+local_test/
+test_data/
+mlartifacts/
+local_*
+outputs
+legacy
+build
