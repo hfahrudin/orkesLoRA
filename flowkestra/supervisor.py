@@ -27,10 +27,10 @@ class Supervisor:
 
     def _check_mlflow_server(self, uri: str) -> bool:
         """
-        Verify that the MLflow server is alive by querying the /api/2.0/preview/mlflow/experiments/list endpoint.
+        Verify that the MLflow server is alive by querying the /#/experiments endpoint.
         """
         try:
-            response = requests.get(f"{uri}/api/2.0/preview/mlflow/experiments/list", timeout=3)
+            response = requests.get(f"{uri}/#/experiments", timeout=3)
             return response.status_code == 200
         except requests.RequestException as e:
             raise RuntimeError(f"Failed to connect to MLflow server at {uri}")
@@ -99,21 +99,21 @@ class Supervisor:
                 ssh_config=None
             )
         
-        elif config['mode'] == 'remote':
-            # You MUST define what happens here, otherwise 'worker' remains None.
-            # Example: Initialize a RemoteWorker class
-            worker = Worker(
-                worker_id=unique_id,
-                workdir=config['target_workdir'],
-                origin_dir=config['workdir'],
-                main_states=self.worker_state,
-                requirements=config['requirements'],
-                pipelines=config.get('pipelines'),
-                experiment_name=self.experiment_name,
-                mlflow_uri=self.mlflow_uri,
-                # Pass the necessary SSH configuration for remote mode
-                ssh_config=config['ssh']
-            )
+        # elif config['mode'] == 'remote':
+        #     # You MUST define what happens here, otherwise 'worker' remains None.
+        #     # Example: Initialize a RemoteWorker class
+        #     worker = Worker(
+        #         worker_id=unique_id,
+        #         workdir=config['target_workdir'],
+        #         origin_dir=config['workdir'],
+        #         main_states=self.worker_state,
+        #         requirements=config['requirements'],
+        #         pipelines=config.get('pipelines'),
+        #         experiment_name=self.experiment_name,
+        #         mlflow_uri=self.mlflow_uri,
+        #         # Pass the necessary SSH configuration for remote mode
+        #         ssh_config=config['ssh']
+        #     )
             
         else:
             # Handle unknown modes explicitly

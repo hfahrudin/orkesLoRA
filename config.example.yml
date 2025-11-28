@@ -8,7 +8,11 @@ instances:
     target_workdir: "./local_train"            # Where training and venv will l
     requirements: "requirements_local.txt"   # Pip requirements file
     pipelines: 
-      train : "mlflow_example.py" # Training script path
+      train : 
+        script: "mlflow_example.py" # Training script path
+        args: [
+          "--epoch", "50"
+        ]
 
 
   - mode: local
@@ -16,7 +20,11 @@ instances:
     target_workdir: "./local_train2"            # Where training and venv will l
     requirements: "requirements_local.txt"   # Pip requirements file
     pipelines: 
-      train : "mlflow_example.py" # Training script path
+      train : 
+        script: "mlflow_example.py" # Training script path
+        args: [
+          "--epoch", "30"
+        ]
 
   # - name: remote_gpu_server
   #   mode: remote

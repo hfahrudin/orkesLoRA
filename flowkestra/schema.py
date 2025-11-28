@@ -15,12 +15,18 @@ class SSHConfig(BaseModel):
     port: int = Field(22, description="SSH port")
 
 
+class PipelineConfig(BaseModel):
+    script: str
+    args: Optional[List[str]] = Field(
+        default_factory=list, description="List of arguments for the script"
+    )
+
 class InstanceConfig(BaseModel):
     mode: str
     workdir: str
     target_workdir: str
     requirements: str
-    pipelines: Dict[str, str]  # ensures pipelines is a dict, not a list
+    pipelines: Dict[str, PipelineConfig]  # ensures pipelines is a dict, not a list
 
 class ConfigSchema(BaseModel):
     mlflow_uri: str
