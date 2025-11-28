@@ -1,96 +1,94 @@
 <h2 align="center">
-  <img width="35%" alt="Model2Vec logo" src="assets/flowkestra.png"><br/>
-  A streamlined MLflow orchestrator 
+  <img width="35%" alt="Flowkestra logo" src="assets/flowkestra.png"><br/>
+  A Lightweight Orchestrator for Machine Learning Experiments
 </h2>
 
-**Status:** Early Prototype (Not Yet Usable)  
 
-This project is an **early-stage framework** for hybrid LLM training and tuning. The goal is to allow experiments **on-premises or in the cloud** with integrated tracking, modular ETL pipelines, and simple deployment.  
 
-> ⚠️ This project is still in the **concept / early development stage**. It is not yet usable.
+Running machine learning experiments often involves a series of steps, such as data processing, training, and evaluation. Managing the dependencies and parameters for each step can become complex. Flowkestra simplifies this process by allowing you to define your entire workflow in a single configuration file.
 
----
-
-## Goal
-
-Enable a unified, flexible workflow for **LLM training and fine-tuning**, with focus on:
-
-- Simplifying ETL and training pipelines
-- Hybrid deployment (cloud or on-premises)
-- MLflow experiment tracking
-- Modular, easy-to-extend architecture
+This approach makes it easier to run, reproduce, and track your experiments, whether you are doing initial exploration on your local machine or preparing for more complex workflows.
 
 ---
 
-## Proposed Features
+## Core Features
 
-- **MLflow Integration**
-  - Track experiments, metrics, and model artifacts
-- **ETL Script Upload**
-  - Modular preprocessing scripts per instance
-- **Parameter & Config Upload**
-  - Upload training parameters and config files
-- **Model Upload & Management**
-  - Support pre-trained models for fine-tuning
-- **Machine Target Selection**
-  - Run training locally or remotely
-- **Error Log Monitoring**
-  - Centralized error logging
-- **Dockerized Environment**
-  - Quick setup with all dependencies
-- **ETL Output Preview**
-  - Inspect processed data before training
+- **YAML-based Workflows**: Define your experiment as a series of tasks in a simple `config.yml` file.
+- **Sequential Task Execution**: Runs your Python scripts in the order you define them.
+- **MLflow Integration**: Automatically logs your runs, parameters, and artifacts to an MLflow tracking server.
+- **Local Execution**: Currently supports running experiments on your local machine.
 
 ---
 
-## Conceptual Workflow
+## Getting Started
 
-1. User provides:
-   - **Configuration file** (train instance, ETL script, parameters)
-   - **ETL script**
-   - **Training parameters**
-2. System performs:
-   - ETL data processing
-   - Model training/fine-tuning
-   - Logging metrics and artifacts to MLflow
-3. Output:
-   - MLflow experiment tracking
-   - Processed ETL data preview
-   - Trained LLM artifacts
+### 1. Installation
+
+```bash
+pip install flowkestra
+```
+*(Note: The package is not yet published to PyPI. To install locally, use `pip install .`)*
+
+### 2. Create a Configuration File
+
+Create a `config.yml` file to define your experiment. This file specifies the scripts to run, their inputs/outputs, and any parameters.
+
+Here is an example for a local run:
+
+```yaml
+# A descriptive name for your MLflow experiment.
+mlflow_uri: "http://localhost:5000"
+experiment_name: "example_experiment"
+
+# Define your experiment instances. Each instance represents a distinct run
+# with its own configuration.
+instances:
+  - mode: local # Currently, 'local' is the supported execution mode.
+    # The working directory for the instance.
+    workdir: "./test_data"
+    # The target directory where training and virtual environment will be created.
+    target_workdir: "./local_train"
+    # Path to a requirements.txt file for this instance's environment.
+    requirements: "requirements_local.txt"
+    # Define pipelines (e.g., 'train', 'evaluate') with their scripts and arguments.
+    pipelines:
+      train:
+        script: "mlflow_example.py" # The Python script to execute.
+        args: # Optional arguments to pass to the script.
+          [
+            "--epoch", "30"
+          ]
+
+```
+
+### 3. Run Your Experiment
+
+Execute your experiment using the Flowkestra CLI, pointing it to your configuration file.
+
+```bash
+flowkestra -f config.yml
+```
+
+Flowkestra will then run your defined tasks in order.
 
 ---
 
-## Advantages
+## Potential Use Cases
 
-- **Hybrid**: Works on-premises or in the cloud
-- **Developer-Friendly**: Modular design for fast iteration
-- **Extensible**: Easy to add new ETL scripts or model configs
-- **Tracking Built-In**: MLflow support from day one
-
----
-
-## Getting Started (Early Prototype)
-
-Currently, the project is **not usable**. Planned steps include:
-
-1. Dockerized environment setup
-2. Script-based ETL and parameter injection
-3. MLflow experiment tracking
+- **Organizing Experiments**: Structure your ML code into reusable scripts and orchestrate them for different experiments.
+- **Reproducible Runs**: Keep your configuration, parameters, and scripts together, ensuring that you can easily rerun an experiment.
+- **Basic ML Pipelines**: Create simple, sequential pipelines for tasks like data preprocessing followed by model training.
 
 ---
 
-## Roadmap / Next Steps
+## Roadmap & Next Features
 
-- Build CLI or web interface for uploading ETL scripts and configs
-- Full MLflow integration for experiments
-- Multi-instance / distributed training support
-- Error monitoring and auto-recovery
-- Support multiple LLM frameworks (Hugging Face, OpenAI, etc.)
+- **Remote Training**: Support for executing tasks on remote machines via SSH.
+- **Automated Parameter Tuning**: Integrate with libraries to automate hyperparameter searches.
+- **Expanded Cloud Support**: Add direct support for cloud environments.
 
 ---
 
 ## Notes
 
-- This project is **still in design/early implementation**.  
-- Intended as a **research & development prototype** before public use.
-- Contributions, feedback, and collaboration ideas are welcome.
+- This project is in its early stages. Contributions and feedback are welcome.
